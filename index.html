@@ -1,0 +1,896 @@
+<title>꽃밭 테트리스</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gamja+Flower&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: a spring garden bed — hold & score on the left, the board in the middle, next blooms on the right; stacks on phones with a touch pad. Single bright theme by choice. */
+:root {
+  --sky: #fff7fa;
+  --blush: #ffd9e7;
+  --butter: #fff0b3;
+  --mint: #d9f5e3;
+  --ink: #4b2a3c;
+  --ink-soft: #8a6276;
+  --rose: #ff5c8d;
+  --leaf: #4f9e63;
+  --card: rgba(255, 255, 255, 0.74);
+  --line: rgba(255, 92, 141, 0.18);
+  --font-display: "Gamja Flower", "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", cursive;
+  --font-body: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(60% 50% at 10% 5%, var(--blush), transparent 70%),
+    radial-gradient(50% 45% at 95% 15%, var(--butter), transparent 70%),
+    radial-gradient(60% 50% at 50% 105%, var(--mint), transparent 70%),
+    var(--sky);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+#petals { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.wrap {
+  position: relative; z-index: 1;
+  max-width: 980px; margin: 0 auto;
+  padding-inline: 16px; padding-block: 14px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+header { text-align: center; }
+h1 {
+  font-family: var(--font-display); font-weight: 400;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1; margin: 0;
+  color: var(--rose); letter-spacing: 0.02em;
+  text-shadow: 0 3px 0 #fff, 0 6px 18px rgba(255, 92, 141, 0.25);
+  text-wrap: balance;
+}
+.tagline { margin: 6px 0 0; color: var(--ink-soft); font-size: 0.95rem; }
+
+.game {
+  display: grid; gap: 18px; align-items: start; justify-content: center;
+  grid-template-columns: 170px auto 170px;
+  grid-template-areas: "left board right";
+}
+.left { grid-area: left; }
+.right { grid-area: right; }
+.boardbox { grid-area: board; }
+.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card {
+  background: var(--card);
+  border: 1.5px solid #fff;
+  border-radius: 18px; padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(255, 92, 141, 0.12);
+  backdrop-filter: blur(6px);
+}
+.label {
+  font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-soft); margin: 0 0 6px;
+}
+.mini { display: block; margin: 0 auto; }
+.stats { display: grid; gap: 8px; }
+.stat { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.stat span { color: var(--ink-soft); font-size: 0.85rem; }
+.stat b { font-size: 1.25rem; font-variant-numeric: tabular-nums; font-weight: 400; font-family: var(--font-body); }
+.stat.big b { font-size: 1.6rem; color: var(--rose); }
+.nextlist { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.bloom { margin-top: 8px; text-align: center; font-family: var(--font-display); font-size: 1.35rem; color: var(--leaf); }
+.bloom small { display: block; font-family: var(--font-body); font-size: 0.75rem; color: var(--ink-soft); }
+.keys { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; font-size: 0.82rem; color: var(--ink-soft); }
+.keys kbd {
+  display: inline-block; min-width: 1.6em; text-align: center;
+  font-family: var(--font-body); font-size: 0.75rem; color: var(--ink);
+  background: #fff; border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 6px; padding: 1px 5px; margin-right: 4px;
+}
+
+.boardbox {
+  position: relative; padding: 8px; border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,247,250,0.6));
+  border: 2px solid #fff;
+  box-shadow: 0 14px 40px rgba(255, 92, 141, 0.18), inset 0 0 0 1px var(--line);
+}
+#board { display: block; border-radius: 14px; touch-action: none; }
+#fx { position: absolute; pointer-events: none; z-index: 2; }
+.overlay { z-index: 3; }
+.overlay {
+  position: absolute; inset: 8px; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  text-align: center; padding: 20px;
+  background: rgba(255, 250, 252, 0.72); backdrop-filter: blur(3px);
+}
+.overlay h2 { font-family: var(--font-display); font-weight: 400; font-size: 2.2rem; margin: 0; color: var(--rose); text-wrap: balance; }
+.overlay p { margin: 0; color: var(--ink-soft); max-width: 22ch; line-height: 1.55; }
+.overlay .final { font-size: 1.1rem; color: var(--ink); }
+.btn {
+  font: inherit; font-size: 1rem; cursor: pointer;
+  color: #fff; background: var(--rose); border: 0;
+  border-radius: 999px; padding: 10px 22px; margin-top: 6px;
+  box-shadow: 0 6px 0 #e04377, 0 10px 20px rgba(255, 92, 141, 0.3);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #e04377, 0 4px 10px rgba(255, 92, 141, 0.3); }
+.btn:focus-visible, .pad button:focus-visible { outline: 3px solid var(--leaf); outline-offset: 3px; }
+
+.pad { display: none; width: 100%; max-width: 420px; gap: 8px; grid-template-columns: repeat(4, 1fr); }
+.pad button {
+  font: inherit; font-size: 1.25rem; color: var(--ink); cursor: pointer;
+  background: var(--card); border: 1.5px solid #fff; border-radius: 16px;
+  padding: 12px 0; box-shadow: 0 4px 0 rgba(255, 92, 141, 0.25);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.pad button small { display: block; font-size: 0.7rem; color: var(--ink-soft); }
+.pad button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(255, 92, 141, 0.25); }
+.pad .wide { grid-column: span 2; }
+
+@media (max-width: 720px), (pointer: coarse) {
+  .pad { display: grid; }
+}
+@media (max-width: 720px) {
+  .tagline { display: none; }
+  .game {
+    grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; max-width: 420px;
+    grid-template-areas: "left right" "board board";
+  }
+  .side { gap: 8px; flex-direction: row; }
+  .card { padding: 8px 10px; border-radius: 14px; }
+  .boardbox { justify-self: center; }
+  .keys-card, .bloom small { display: none; }
+  .holdcard, .nextcard { flex: 0 0 auto; }
+  .statcard { flex: 1; }
+  .nextlist { flex-direction: row; }
+  .nextlist canvas:not(:first-child) { display: none; }
+  .bloom { font-size: 1rem; margin-top: 2px; }
+  .stats { gap: 2px; }
+  .stat b { font-size: 1rem; }
+  .stat.big b { font-size: 1.1rem; }
+  .stat span { font-size: 0.75rem; }
+  .right { justify-content: flex-end; }
+  .right .card.flowercard { flex: 1; display: flex; align-items: center; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn, .pad button { transition: none; }
+}
+</style>
+
+<canvas id="petals" aria-hidden="true"></canvas>
+
+<div class="wrap">
+  <header>
+    <h1>꽃밭 테트리스</h1>
+    <p class="tagline">블록마다 꽃이 피어요. 한 줄을 채우면 꽃잎이 흩날립니다.</p>
+  </header>
+
+  <main class="game">
+    <aside class="side left">
+      <div class="card holdcard">
+        <p class="label">보관</p>
+        <canvas id="hold" class="mini"></canvas>
+      </div>
+      <div class="card statcard">
+        <div class="stats">
+          <div class="stat big"><span>점수</span><b id="score">0</b></div>
+          <div class="stat"><span>최고</span><b id="best">0</b></div>
+          <div class="stat"><span>레벨</span><b id="level">1</b></div>
+          <div class="stat"><span>줄</span><b id="lines">0</b></div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="boardbox" aria-label="게임 보드">
+      <canvas id="board" role="img" aria-label="테트리스 보드"></canvas>
+      <canvas id="fx" aria-hidden="true"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="ovTitle">봄날의 꽃밭</h2>
+        <p id="ovText">일곱 가지 꽃 블록을 쌓아 줄을 채워 보세요.</p>
+        <button class="btn" id="ovBtn" type="button">게임 시작</button>
+      </div>
+    </section>
+
+    <aside class="side right">
+      <div class="card nextcard">
+        <p class="label">다음 꽃</p>
+        <div class="nextlist">
+          <canvas id="next0" class="mini"></canvas>
+          <canvas id="next1" class="mini"></canvas>
+          <canvas id="next2" class="mini"></canvas>
+        </div>
+      </div>
+      <div class="card flowercard">
+        <div class="bloom" id="bloom">수레국화<small>지금 피는 꽃</small></div>
+      </div>
+      <div class="card keys-card">
+        <p class="label">조작</p>
+        <ul class="keys">
+          <li><kbd>←</kbd><kbd>→</kbd>이동</li>
+          <li><kbd>↑</kbd><kbd>X</kbd>회전</li>
+          <li><kbd>Z</kbd>반대 회전</li>
+          <li><kbd>↓</kbd>천천히 내리기</li>
+          <li><kbd>Space</kbd>바로 내리기</li>
+          <li><kbd>C</kbd>보관</li>
+          <li><kbd>P</kbd>일시정지</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <div class="pad" id="pad">
+    <button type="button" id="b-rotl" aria-label="반대 회전">⟲<small>회전</small></button>
+    <button type="button" id="b-hold" aria-label="보관">❀<small>보관</small></button>
+    <button type="button" id="b-pause" aria-label="일시정지">Ⅱ<small>정지</small></button>
+    <button type="button" id="b-rot" aria-label="회전">⟳<small>회전</small></button>
+    <button type="button" id="b-left" aria-label="왼쪽">←</button>
+    <button type="button" id="b-down" aria-label="천천히 내리기">↓</button>
+    <button type="button" id="b-right" aria-label="오른쪽">→</button>
+    <button type="button" id="b-drop" aria-label="바로 내리기">⤓<small>드롭</small></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const COLS = 10, ROWS = 20;
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Each tetromino is a flower: tile tint, petal colour, centre colour, petal count & shape.
+  const FLOWERS = {
+    I: { name: '수레국화', bg: ['#e4efff', '#c7dcff'], petal: ['#8fbaff', '#4f8ef0'], center: '#ffd84d', n: 8, len: 0.30, wid: 0.10, cr: 0.11 },
+    O: { name: '해바라기', bg: ['#fff6cf', '#ffe69a'], petal: ['#ffd84a', '#ffb800'], center: '#8a5a2b', n: 12, len: 0.30, wid: 0.075, cr: 0.15 },
+    T: { name: '벚꽃', bg: ['#ffeef5', '#ffd3e4'], petal: ['#ffd0e2', '#ff8fb8'], center: '#ff5c8d', n: 5, len: 0.25, wid: 0.15, cr: 0.07, notch: true },
+    S: { name: '데이지', bg: ['#e2f7e3', '#bfe9c4'], petal: ['#ffffff', '#f1f1f1'], center: '#ffc93c', n: 10, len: 0.29, wid: 0.075, cr: 0.11 },
+    Z: { name: '튤립', bg: ['#ffe6e8', '#ffc5cc'], petal: ['#ff8a9a', '#f0445f'], center: '#ffe08a', n: 6, len: 0.26, wid: 0.13, cr: 0.09 },
+    J: { name: '라벤더', bg: ['#f1eaff', '#ddccff'], petal: ['#c8a8ff', '#9466f0'], center: '#fff3b0', n: 6, len: 0.27, wid: 0.12, cr: 0.09 },
+    L: { name: '금잔화', bg: ['#fff0e0', '#ffd8b0'], petal: ['#ffb066', '#ff7f1a'], center: '#c2410c', n: 9, len: 0.28, wid: 0.10, cr: 0.12 },
+  };
+  const SHAPES = {
+    I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+    O: [[1,1],[1,1]],
+    T: [[0,1,0],[1,1,1],[0,0,0]],
+    S: [[0,1,1],[1,1,0],[0,0,0]],
+    Z: [[1,1,0],[0,1,1],[0,0,0]],
+    J: [[1,0,0],[1,1,1],[0,0,0]],
+    L: [[0,0,1],[1,1,1],[0,0,0]],
+  };
+  const LINE_SCORE = [0, 100, 300, 500, 800];
+
+  // ---------- flower tile sprites ----------
+  const spriteCache = new Map();
+  function drawFlower(ctx, s, f) {
+    const r = s * 0.24, p = Math.max(1, s * 0.04);
+    const g = ctx.createLinearGradient(0, 0, 0, s);
+    g.addColorStop(0, f.bg[0]); g.addColorStop(1, f.bg[1]);
+    ctx.fillStyle = g;
+    roundRect(ctx, p, p, s - 2 * p, s - 2 * p, r); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = Math.max(1, s * 0.05);
+    roundRect(ctx, p * 1.6, p * 1.6, s - 3.2 * p, s - 3.2 * p, r * 0.9); ctx.stroke();
+
+    ctx.save();
+    ctx.translate(s / 2, s / 2);
+    for (let i = 0; i < f.n; i++) {
+      ctx.save();
+      ctx.rotate((i / f.n) * Math.PI * 2 + 0.2);
+      const pg = ctx.createLinearGradient(0, 0, 0, -s * f.len * 2);
+      pg.addColorStop(0, f.petal[1]); pg.addColorStop(1, f.petal[0]);
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.ellipse(0, -s * f.len, s * f.wid, s * f.len, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (f.notch) {
+        ctx.fillStyle = f.bg[0];
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.04, -s * f.len * 2 - 1);
+        ctx.lineTo(0, -s * f.len * 1.72);
+        ctx.lineTo(s * 0.04, -s * f.len * 2 - 1);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    ctx.fillStyle = f.center;
+    ctx.beginPath(); ctx.arc(0, 0, s * f.cr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.arc(-s * f.cr * 0.35, -s * f.cr * 0.35, s * f.cr * 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function sprite(t, s) {
+    const key = t + s;
+    let c = spriteCache.get(key);
+    if (!c) {
+      c = document.createElement('canvas');
+      c.width = c.height = Math.ceil(s * DPR);
+      const cx = c.getContext('2d');
+      cx.scale(DPR, DPR);
+      drawFlower(cx, s, FLOWERS[t]);
+      spriteCache.set(key, c);
+    }
+    return c;
+  }
+
+  // ---------- state ----------
+  const $ = (id) => document.getElementById(id);
+  const boardCv = $('board'), bctx = boardCv.getContext('2d');
+  const fxCv = $('fx'), fctx = fxCv.getContext('2d');
+  let fxMargin = 120;
+  const holdCv = $('hold');
+  const nextCvs = [$('next0'), $('next1'), $('next2')];
+  let cell = 30;
+
+  let S = freshState();
+  let best = 0;
+  try { best = Number(localStorage.getItem('flower-tetris-best')) || 0; } catch (e) {}
+
+  function freshState() {
+    return {
+      board: Array.from({ length: ROWS }, () => Array(COLS).fill(null)),
+      cur: null, hold: null, canHold: true, queue: [],
+      score: 0, lines: 0, level: 1,
+      mode: 'ready', dropAcc: 0, lockAcc: 0, lockResets: 0, clearing: null,
+    };
+  }
+  let particles = [];
+
+  function demoGarden() {
+    const rows = [
+      'SS.ZZTTTLL',
+      'SJJZZ.TOOL',
+      'IIIIJ.JOOL',
+      'LLLOOJJJ.T',
+      'L.OOTTTZZT',
+    ];
+    rows.forEach((row, i) => {
+      const y = ROWS - rows.length + i;
+      [...row].forEach((ch, x) => { S.board[y][x] = ch === '.' ? null : ch; });
+    });
+    S.queue = ['T', 'O', 'I', 'L'];
+    S.hold = 'S';
+  }
+
+  function bag() {
+    const a = Object.keys(SHAPES);
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  function fillQueue() { while (S.queue.length < 5) S.queue.push(...bag()); }
+
+  function collide(m, x, y) {
+    for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++) {
+      if (!m[r][c]) continue;
+      const nx = x + c, ny = y + r;
+      if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+      if (ny >= 0 && S.board[ny][nx]) return true;
+    }
+    return false;
+  }
+  function rotated(m, dir) {
+    const n = m.length, out = Array.from({ length: n }, () => Array(n).fill(0));
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      if (dir > 0) out[c][n - 1 - r] = m[r][c]; else out[n - 1 - c][r] = m[r][c];
+    }
+    return out;
+  }
+  function makePiece(t) {
+    const m = SHAPES[t].map((r) => r.slice());
+    return { t, m, x: Math.floor((COLS - m.length) / 2), y: t === 'I' ? -1 : 0 };
+  }
+  function spawn(t) {
+    fillQueue();
+    const p = makePiece(t || S.queue.shift());
+    fillQueue();
+    S.cur = p; S.dropAcc = 0; S.lockAcc = 0; S.lockResets = 0;
+    if (collide(p.m, p.x, p.y)) return gameOver();
+    renderSide();
+  }
+  const grounded = () => collide(S.cur.m, S.cur.x, S.cur.y + 1);
+  function resetLock() { if (S.lockResets < 15) { S.lockAcc = 0; S.lockResets++; } }
+
+  function move(dx) {
+    if (!active()) return;
+    if (!collide(S.cur.m, S.cur.x + dx, S.cur.y)) { S.cur.x += dx; if (grounded()) resetLock(); }
+  }
+  function rotate(dir) {
+    if (!active() || S.cur.t === 'O') return;
+    const m = rotated(S.cur.m, dir);
+    const kicks = S.cur.t === 'I'
+      ? [[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1],[0,1]]
+      : [[0,0],[-1,0],[1,0],[0,-1],[-1,-1],[1,-1],[0,1]];
+    for (const [kx, ky] of kicks) {
+      if (!collide(m, S.cur.x + kx, S.cur.y + ky)) {
+        S.cur.m = m; S.cur.x += kx; S.cur.y += ky;
+        if (grounded()) resetLock();
+        return;
+      }
+    }
+  }
+  function softDrop() {
+    if (!active()) return;
+    if (!grounded()) { S.cur.y++; S.score += 1; S.dropAcc = 0; renderStats(); }
+    else S.lockAcc = 1e9;
+  }
+  function hardDrop() {
+    if (!active()) return;
+    let n = 0;
+    while (!grounded()) { S.cur.y++; n++; }
+    S.score += n * 2;
+    lock();
+  }
+  function hold() {
+    if (!active() || !S.canHold) return;
+    const t = S.cur.t;
+    if (S.hold) { const h = S.hold; S.hold = t; spawn(h); }
+    else { S.hold = t; spawn(); }
+    S.canHold = false;
+    renderSide();
+  }
+  const active = () => S.mode === 'play' && S.cur && !S.clearing;
+
+  function lock() {
+    const { m, x, y, t } = S.cur;
+    let topOut = false;
+    for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++) {
+      if (!m[r][c]) continue;
+      if (y + r < 0) topOut = true; else S.board[y + r][x + c] = t;
+    }
+    S.cur = null;
+    S.canHold = true;
+    if (topOut) return gameOver();
+    const full = [];
+    for (let r = 0; r < ROWS; r++) if (S.board[r].every(Boolean)) full.push(r);
+    if (full.length) {
+      S.clearing = { rows: full, t: 0 };
+      S.score += LINE_SCORE[full.length] * S.level;
+      full.forEach((r, i) => burst(r, full.length, i));
+      const names = ['', '', '더블 블룸!', '트리플 블룸!', '꽃비 테트리스!'];
+      if (!reduceMotion) {
+        if (names[full.length]) banner = { text: names[full.length], y: (full[0] + full[full.length - 1] + 1) / 2 * cell, t: 0 };
+        shake = 120 + full.length * 70;
+      }
+    } else spawn();
+    renderStats();
+  }
+  function finishClear() {
+    const rows = S.clearing.rows;
+    S.board = S.board.filter((_, i) => !rows.includes(i));
+    while (S.board.length < ROWS) S.board.unshift(Array(COLS).fill(null));
+    S.lines += rows.length;
+    S.level = Math.floor(S.lines / 10) + 1;
+    S.clearing = null;
+    renderStats();
+    spawn();
+  }
+  // Line clear: each flower pops, spins up and away, sheds a ring of petals,
+  // a pollen ring and gold sparkles. The blast ripples out from the middle of the row.
+  const CLEAR_MS = 560;
+  let banner = null, shake = 0;
+  function burst(row, lines, idx) {
+    if (reduceMotion) return;
+    const k = 1 + (lines - 1) * 0.3;
+    const rand = (a, b) => a + Math.random() * (b - a);
+    for (let c = 0; c < COLS; c++) {
+      const t = S.board[row][c] || 'T';
+      const f = FLOWERS[t];
+      const x = (c + 0.5) * cell, y = (row + 0.5) * cell;
+      const delay = Math.abs(c - 4.5) * 24 + idx * 40;
+      particles.push({ kind: 'ring', x, y, r: cell * 0.25, vr: cell * 0.0045 * k, w: cell * 0.12, life: 1, decay: 1 / 520, color: f.petal[1], delay });
+      particles.push({
+        kind: 'flower', t, x, y, delay,
+        vx: (c - 4.5) * cell * 0.0014 * k + rand(-1, 1) * cell * 0.004,
+        vy: -rand(0.016, 0.028) * cell * k, g: 0.000045 * cell, drag: 0.999,
+        rot: 0, vr: rand(-0.012, 0.012), scale: 1, vs: 0.0012, life: 1, decay: 1 / rand(1000, 1400),
+      });
+      for (let i = 0; i < Math.round(11 * k); i++) {
+        const a = Math.random() * Math.PI * 2, sp = rand(0.008, 0.034) * cell * k;
+        particles.push({
+          kind: 'petal', x, y, delay, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.01 * cell,
+          g: 0.00003 * cell, drag: 0.997, rot: Math.random() * 6, vr: rand(-0.015, 0.015),
+          life: 1, decay: 1 / rand(900, 1700), size: cell * rand(0.1, 0.22),
+          color: Math.random() < 0.5 ? f.petal[0] : f.petal[1], flutter: Math.random() * 6,
+        });
+      }
+      for (let i = 0; i < 4; i++) {
+        const a = Math.random() * Math.PI * 2, sp = rand(0.004, 0.02) * cell * k;
+        particles.push({
+          kind: 'spark', x, y, delay: delay + rand(0, 120), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          drag: 0.995, life: 1, decay: 1 / rand(500, 900), size: cell * rand(0.1, 0.22),
+          color: Math.random() < 0.5 ? '#ffd23f' : '#ffffff', tw: Math.random() * 6,
+        });
+      }
+    }
+  }
+  const speed = () => Math.max(60, 800 * Math.pow(0.84, S.level - 1));
+
+  function updateFx(dt) {
+    for (const p of particles) {
+      if (p.delay > 0) { p.delay -= dt; continue; }
+      if (p.kind === 'ring') p.r += p.vr * dt;
+      else {
+        const d = p.drag ? Math.pow(p.drag, dt) : 1;
+        p.vx *= d; p.vy = p.vy * d + (p.g || 0) * dt;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.rot = (p.rot || 0) + (p.vr || 0) * dt;
+        if (p.vs) p.scale += p.vs * dt;
+        if (p.flutter !== undefined) p.flutter += dt * 0.012;
+        if (p.tw !== undefined) p.tw += dt * 0.03;
+      }
+      p.life -= p.decay * dt;
+    }
+    particles = particles.filter((p) => p.life > 0);
+    if (banner) { banner.t += dt; if (banner.t > 1300) banner = null; }
+    if (shake > 0) shake = Math.max(0, shake - dt);
+  }
+
+  function update(dt) {
+    updateFx(dt);
+    if (S.mode !== 'play') return;
+    if (S.clearing) { S.clearing.t += dt; if (S.clearing.t >= CLEAR_MS) finishClear(); return; }
+    if (!S.cur) { spawn(); return; }
+    S.dropAcc += dt;
+    const iv = speed();
+    while (S.dropAcc >= iv) {
+      S.dropAcc -= iv;
+      if (!grounded()) { S.cur.y++; S.lockResets = 0; } else break;
+    }
+    if (grounded()) { S.lockAcc += dt; if (S.lockAcc >= 450) lock(); }
+    else S.lockAcc = 0;
+  }
+
+  // ---------- render ----------
+  function drawBoard() {
+    const w = COLS * cell, h = ROWS * cell;
+    bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bctx.clearRect(0, 0, w, h);
+    if (shake > 0) {
+      const a = Math.min(1, shake / 200) * cell * 0.12;
+      bctx.translate((Math.random() - 0.5) * a, (Math.random() - 0.5) * a);
+    }
+    // soil-pink grid dots
+    bctx.fillStyle = 'rgba(255,92,141,0.16)';
+    for (let r = 1; r < ROWS; r++) for (let c = 1; c < COLS; c++) {
+      bctx.beginPath(); bctx.arc(c * cell, r * cell, Math.max(1, cell * 0.045), 0, Math.PI * 2); bctx.fill();
+    }
+    const clr = S.clearing;
+    for (let r = 0; r < ROWS; r++) {
+      const clearingRow = clr && clr.rows.includes(r);
+      if (clearingRow) {
+        // flowers swell, glow, then shrink away while the burst flies off
+        const p = clr.t / CLEAR_MS;
+        const glow = bctx.createLinearGradient(0, r * cell, 0, (r + 1) * cell);
+        glow.addColorStop(0, 'rgba(255,240,160,0)');
+        glow.addColorStop(0.5, `rgba(255,236,150,${0.9 * (1 - p)})`);
+        glow.addColorStop(1, 'rgba(255,240,160,0)');
+        bctx.fillStyle = glow;
+        bctx.fillRect(0, r * cell - cell * 0.5, w, cell * 2);
+        if (!reduceMotion) {
+          for (let c = 0; c < COLS; c++) {
+            const t = S.board[r][c];
+            if (!t) continue;
+            const local = Math.max(0, p - Math.abs(c - 4.5) * 0.025);
+            const s = local < 0.25 ? 1 + local * 1.2 : 1.3 * Math.max(0, 1 - (local - 0.25) / 0.45);
+            if (s <= 0) continue;
+            const sz = cell * s;
+            bctx.drawImage(sprite(t, cell), (c + 0.5) * cell - sz / 2, (r + 0.5) * cell - sz / 2, sz, sz);
+          }
+          bctx.globalAlpha = Math.max(0, 0.75 * (1 - p * 2.5));
+          bctx.fillStyle = '#fff';
+          bctx.fillRect(0, r * cell, w, cell);
+        } else {
+          bctx.globalAlpha = Math.max(0, 1 - p);
+          for (let c = 0; c < COLS; c++) if (S.board[r][c]) bctx.drawImage(sprite(S.board[r][c], cell), c * cell, r * cell, cell, cell);
+        }
+        bctx.globalAlpha = 1;
+        continue;
+      }
+      for (let c = 0; c < COLS; c++) {
+        const t = S.board[r][c];
+        if (t) bctx.drawImage(sprite(t, cell), c * cell, r * cell, cell, cell);
+      }
+    }
+    if (S.cur && S.mode !== 'over') {
+      const { m, x, t } = S.cur;
+      let gy = S.cur.y;
+      while (!collide(m, x, gy + 1)) gy++;
+      bctx.globalAlpha = 0.26;
+      eachCell(m, (r, c) => { if (gy + r >= 0) bctx.drawImage(sprite(t, cell), (x + c) * cell, (gy + r) * cell, cell, cell); });
+      bctx.globalAlpha = 1;
+      eachCell(m, (r, c) => { if (S.cur.y + r >= 0) bctx.drawImage(sprite(t, cell), (x + c) * cell, (S.cur.y + r) * cell, cell, cell); });
+    }
+  }
+
+  // Effects live on a larger canvas around the board so the burst can spill past its edges.
+  function drawFx() {
+    const M = fxMargin, W = COLS * cell + 2 * M, H = ROWS * cell + 2 * M;
+    fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fctx.clearRect(0, 0, W, H);
+    fctx.translate(M, M);
+    for (const p of particles) {
+      if (p.delay > 0) continue;
+      const a = Math.max(0, Math.min(1, p.life * 1.4));
+      fctx.save();
+      fctx.globalAlpha = a;
+      fctx.translate(p.x, p.y);
+      if (p.kind === 'ring') {
+        fctx.strokeStyle = p.color; fctx.lineWidth = p.w * p.life;
+        fctx.beginPath(); fctx.arc(0, 0, p.r, 0, Math.PI * 2); fctx.stroke();
+        fctx.setLineDash([2, cell * 0.25]);
+        fctx.strokeStyle = '#ffd23f'; fctx.lineWidth = cell * 0.08;
+        fctx.beginPath(); fctx.arc(0, 0, p.r * 1.25, 0, Math.PI * 2); fctx.stroke();
+      } else if (p.kind === 'flower') {
+        fctx.rotate(p.rot);
+        const sz = cell * p.scale;
+        fctx.drawImage(sprite(p.t, cell), -sz / 2, -sz / 2, sz, sz);
+      } else if (p.kind === 'petal') {
+        fctx.rotate(p.rot);
+        fctx.scale(1, 0.45 + 0.55 * Math.abs(Math.sin(p.flutter)));
+        const s = p.size;
+        fctx.fillStyle = p.color;
+        fctx.beginPath();
+        fctx.moveTo(0, -s);
+        fctx.bezierCurveTo(s * 0.9, -s * 0.6, s * 0.6, s * 0.7, 0, s);
+        fctx.bezierCurveTo(-s * 0.6, s * 0.7, -s * 0.9, -s * 0.6, 0, -s);
+        fctx.fill();
+      } else if (p.kind === 'spark') {
+        const s = p.size * (0.6 + 0.4 * Math.abs(Math.sin(p.tw)));
+        fctx.fillStyle = p.color;
+        fctx.beginPath();
+        fctx.moveTo(0, -s); fctx.quadraticCurveTo(0, 0, s, 0); fctx.quadraticCurveTo(0, 0, 0, s);
+        fctx.quadraticCurveTo(0, 0, -s, 0); fctx.quadraticCurveTo(0, 0, 0, -s);
+        fctx.fill();
+      }
+      fctx.restore();
+    }
+    if (banner) {
+      const t = banner.t, pop = t < 220 ? 0.6 + 0.5 * (t / 220) : 1.1 - Math.min(0.1, (t - 220) / 1000);
+      const alpha = t > 950 ? Math.max(0, 1 - (t - 950) / 350) : 1;
+      fctx.save();
+      fctx.globalAlpha = alpha;
+      fctx.translate(COLS * cell / 2, banner.y - t * 0.02);
+      fctx.scale(pop, pop);
+      fctx.rotate(-0.05);
+      fctx.font = `${Math.round(cell * 1.35)}px "Gamja Flower", "Gowun Dodum", cursive`;
+      fctx.textAlign = 'center'; fctx.textBaseline = 'middle';
+      fctx.lineJoin = 'round';
+      fctx.lineWidth = cell * 0.28; fctx.strokeStyle = '#fff';
+      fctx.strokeText(banner.text, 0, 0);
+      const g = fctx.createLinearGradient(0, -cell * 0.6, 0, cell * 0.6);
+      g.addColorStop(0, '#ff8fb8'); g.addColorStop(1, '#ff3d78');
+      fctx.fillStyle = g;
+      fctx.fillText(banner.text, 0, 0);
+      fctx.restore();
+    }
+  }
+  function eachCell(m, fn) { for (let r = 0; r < m.length; r++) for (let c = 0; c < m.length; c++) if (m[r][c]) fn(r, c); }
+
+  function drawMini(cv, t, dim) {
+    const mc = Math.round(cell * 0.62);
+    const W = mc * 4, H = mc * 2.6;
+    if (cv.width !== Math.round(W * DPR)) {
+      cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+      cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    if (!t) return;
+    const m = SHAPES[t];
+    let minR = 9, maxR = -1, minC = 9, maxC = -1;
+    eachCell(m, (r, c) => { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c); });
+    const ox = (W - (maxC - minC + 1) * mc) / 2, oy = (H - (maxR - minR + 1) * mc) / 2;
+    ctx.globalAlpha = dim ? 0.4 : 1;
+    eachCell(m, (r, c) => ctx.drawImage(sprite(t, mc), ox + (c - minC) * mc, oy + (r - minR) * mc, mc, mc));
+  }
+  function renderSide() {
+    drawMini(holdCv, S.hold, !S.canHold && S.mode === 'play');
+    nextCvs.forEach((cv, i) => drawMini(cv, S.queue[i]));
+    const t = S.cur ? S.cur.t : S.queue[0];
+    if (t) $('bloom').innerHTML = FLOWERS[t].name + '<small>지금 피는 꽃</small>';
+  }
+  function renderStats() {
+    $('score').textContent = S.score.toLocaleString('ko-KR');
+    $('lines').textContent = S.lines;
+    $('level').textContent = S.level;
+    if (S.score > best) {
+      best = S.score;
+      try { localStorage.setItem('flower-tetris-best', String(best)); } catch (e) {}
+    }
+    $('best').textContent = best.toLocaleString('ko-KR');
+  }
+
+  // ---------- overlay & modes ----------
+  const overlay = $('overlay');
+  function showOverlay(title, text, btn) {
+    $('ovTitle').textContent = title;
+    $('ovText').innerHTML = text;
+    $('ovBtn').textContent = btn;
+    overlay.hidden = false;
+  }
+  function start() {
+    S = freshState();
+    particles = [];
+    S.mode = 'play';
+    overlay.hidden = true;
+    fillQueue();
+    spawn();
+    renderStats();
+    boardCv.focus?.();
+  }
+  function togglePause() {
+    if (S.mode === 'play') { S.mode = 'pause'; showOverlay('잠시 쉬는 중', '꽃들이 기다리고 있어요.', '이어서 하기'); }
+    else if (S.mode === 'pause') { S.mode = 'play'; overlay.hidden = true; }
+  }
+  function gameOver() {
+    S.mode = 'over';
+    renderStats();
+    showOverlay('꽃밭이 가득 찼어요',
+      `<span class="final">점수 ${S.score.toLocaleString('ko-KR')} · ${S.lines}줄</span>`, '다시 심기');
+  }
+  $('ovBtn').addEventListener('click', () => { S.mode === 'pause' ? togglePause() : start(); });
+
+  // ---------- input ----------
+  document.addEventListener('keydown', (e) => {
+    const k = e.key;
+    const gameKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '];
+    if (gameKeys.includes(k)) e.preventDefault();
+    if (S.mode === 'ready' || S.mode === 'over') {
+      if (k === 'Enter' || (k === ' ' && document.activeElement !== $('ovBtn'))) start();
+      return;
+    }
+    if (k === 'p' || k === 'P' || k === 'Escape') return togglePause();
+    if (S.mode !== 'play') return;
+    switch (k) {
+      case 'ArrowLeft': move(-1); break;
+      case 'ArrowRight': move(1); break;
+      case 'ArrowDown': softDrop(); break;
+      case 'ArrowUp': case 'x': case 'X': rotate(1); break;
+      case 'z': case 'Z': case 'Control': rotate(-1); break;
+      case ' ': hardDrop(); break;
+      case 'c': case 'C': case 'Shift': hold(); break;
+    }
+  });
+
+  function bindPad(id, fn, repeat) {
+    const el = $(id);
+    let t1 = null, t2 = null;
+    const stop = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      fn();
+      if (repeat) { t1 = setTimeout(() => { t2 = setInterval(fn, 55); }, 170); }
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, stop));
+    el.addEventListener('click', (e) => { if (e.detail === 0) fn(); }); // keyboard activation
+  }
+  bindPad('b-left', () => move(-1), true);
+  bindPad('b-right', () => move(1), true);
+  bindPad('b-down', softDrop, true);
+  bindPad('b-rot', () => rotate(1));
+  bindPad('b-rotl', () => rotate(-1));
+  bindPad('b-drop', hardDrop);
+  bindPad('b-hold', hold);
+  bindPad('b-pause', togglePause);
+
+  // swipe / tap on the board itself
+  let touchStart = null;
+  boardCv.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') touchStart = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }; });
+  boardCv.addEventListener('pointermove', (e) => {
+    if (!touchStart) return;
+    const dx = e.clientX - touchStart.x;
+    const step = cell * 0.9;
+    while (Math.abs(dx - touchStart.moved * step) >= step) {
+      const dir = dx > touchStart.moved * step ? 1 : -1;
+      move(dir); touchStart.moved += dir;
+    }
+  });
+  boardCv.addEventListener('pointerup', (e) => {
+    if (!touchStart) return;
+    const dy = e.clientY - touchStart.y, dx = e.clientX - touchStart.x;
+    const dt = performance.now() - touchStart.t;
+    if (dy > cell * 3 && dt < 350) hardDrop();
+    else if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && touchStart.moved === 0) rotate(1);
+    touchStart = null;
+  });
+
+  // ---------- layout ----------
+  function layout() {
+    const narrow = window.innerWidth <= 720;
+    const headerH = document.querySelector('header').offsetHeight;
+    const padH = getComputedStyle($('pad')).display === 'none' ? 0 : 150;
+    const topRow = narrow ? 120 : 0;
+    const avH = window.innerHeight - headerH - padH - topRow - 70;
+    const avW = narrow ? Math.min(window.innerWidth - 32 - 20, 400) : 380;
+    const next = Math.max(14, Math.floor(Math.min(avH / ROWS, avW / COLS, 34)));
+    if (next !== cell || !boardCv.width) {
+      cell = next;
+      spriteCache.clear();
+      boardCv.width = COLS * cell * DPR; boardCv.height = ROWS * cell * DPR;
+      boardCv.style.width = COLS * cell + 'px'; boardCv.style.height = ROWS * cell + 'px';
+      fxMargin = cell * 4;
+      const fw = COLS * cell + 2 * fxMargin, fh = ROWS * cell + 2 * fxMargin;
+      fxCv.width = fw * DPR; fxCv.height = fh * DPR;
+      fxCv.style.width = fw + 'px'; fxCv.style.height = fh + 'px';
+      fxCv.style.left = fxCv.style.top = (8 - fxMargin) + 'px';
+      nextCvs.concat(holdCv).forEach((cv) => (cv.width = 0));
+      renderSide();
+    }
+  }
+  window.addEventListener('resize', layout);
+
+  // ---------- ambient falling petals ----------
+  const pc = $('petals'), pctx = pc.getContext('2d');
+  const petalColors = ['#ffc4d8', '#ffd9e6', '#ffe9a8', '#ffb3cb', '#e7d6ff', '#ffffff'];
+  let petals = [];
+  function sizePetals() {
+    pc.width = innerWidth * DPR; pc.height = innerHeight * DPR;
+    const n = Math.round(Math.min(40, innerWidth / 28));
+    petals = Array.from({ length: n }, () => newPetal(true));
+  }
+  function newPetal(anywhere) {
+    return {
+      x: Math.random() * innerWidth, y: anywhere ? Math.random() * innerHeight : -20,
+      s: 5 + Math.random() * 8, vy: 0.012 + Math.random() * 0.025, sway: Math.random() * 6,
+      rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.002,
+      c: petalColors[Math.floor(Math.random() * petalColors.length)],
+    };
+  }
+  function drawPetals(dt) {
+    pctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    pctx.clearRect(0, 0, innerWidth, innerHeight);
+    for (const p of petals) {
+      if (!reduceMotion) {
+        p.y += p.vy * dt; p.sway += dt * 0.0012; p.rot += p.vr * dt;
+        p.x += Math.sin(p.sway) * 0.02 * dt;
+        if (p.y > innerHeight + 20) Object.assign(p, newPetal(false));
+      }
+      pctx.save();
+      pctx.translate(p.x, p.y); pctx.rotate(p.rot);
+      pctx.fillStyle = p.c; pctx.globalAlpha = 0.75;
+      pctx.beginPath();
+      pctx.moveTo(0, -p.s);
+      pctx.bezierCurveTo(p.s * 0.9, -p.s * 0.6, p.s * 0.6, p.s * 0.7, 0, p.s);
+      pctx.bezierCurveTo(-p.s * 0.6, p.s * 0.7, -p.s * 0.9, -p.s * 0.6, 0, -p.s);
+      pctx.fill();
+      pctx.restore();
+    }
+  }
+  window.addEventListener('resize', sizePetals);
+
+  // ---------- loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last); last = now;
+    update(dt);
+    drawBoard();
+    drawFx();
+    drawPetals(dt);
+    requestAnimationFrame(frame);
+  }
+
+  function boot(data) {
+    layout();
+    sizePetals();
+    if (data && data.S && data.S.mode !== 'ready') {
+      S = data.S;
+      if (S.mode === 'play') S.mode = 'pause';
+      if (S.mode === 'pause') showOverlay('잠시 쉬는 중', '꽃들이 기다리고 있어요.', '이어서 하기');
+      else if (S.mode === 'over') gameOver();
+    } else {
+      demoGarden();
+    }
+    renderSide();
+    renderStats();
+    requestAnimationFrame(frame);
+  }
+  window.claude?.hot?.snapshot?.(() => ({ S: { ...S, clearing: null } }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+})();
+</script>
